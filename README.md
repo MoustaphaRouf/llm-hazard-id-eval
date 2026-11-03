@@ -21,7 +21,7 @@ panel's situation: same information, same task.
 | Blind condition | the model sees only the pre-session context | can it do the panel's job? |
 | Challenger condition | the model also sees the panel's hazards and must find what is missing | can it complement the panel? |
 | Models | three providers, exact versions frozen | results should not be one vendor's artefact |
-| Repetitions | 5 runs at temperature 0.7 | a hazard that appears once in five runs is not the same evidence as one that appears every time |
+| Repetitions | 5 runs at temperature 1.0 (the only value current Anthropic APIs accept, used for all models) | a hazard that appears once in five runs is not the same evidence as one that appears every time |
 | Anti-contamination | automatic lexical check + manual check | no panel hazard may leak into the blind context |
 | Matching | TF-IDF similarity, threshold fixed on calibration files before results | *proposes* correspondences only |
 | Judgement | blind adjudication by peers who do not know the files: panel and model hazards mixed, origin hidden | no model grades its own output, and the study lead does not adjudicate |

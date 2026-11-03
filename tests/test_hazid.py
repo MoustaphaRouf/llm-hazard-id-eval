@@ -147,3 +147,10 @@ def test_provider_reuses_one_client():
             return object()
     p = P()
     assert p._client() is p._client() and len(made) == 1
+
+
+def test_anthropic_requires_default_temperature():
+    from hazid.providers import AnthropicProvider
+    with pytest.raises(ValueError):
+        AnthropicProvider().complete("claude-sonnet-4-6", "s", "p", 0.7, 100)
+    assert any("1.0" in w for w in Protocol(temperature=0.7, match_threshold=0.5).warnings())

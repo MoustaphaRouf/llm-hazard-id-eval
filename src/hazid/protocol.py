@@ -87,7 +87,9 @@ class Protocol:
         "B": {"provider": "openai", "model": "gpt-5.1"},
         "C": {"provider": "google", "model": "gemini-3-pro"},
     })
-    temperature: float = 0.7      # > 0: needed to measure run-to-run stability
+    # 1.0 for every model: current Anthropic APIs only sample at 1.0, so the same value is used for
+    # all providers to keep conditions identical. > 0 is what run-to-run stability needs.
+    temperature: float = 1.0
     n_runs: int = 5               # repetitions per (dossier x model x condition)
     max_tokens: int = 8000
     match_threshold: float | None = None  # set from the calibration step, never after results
@@ -98,6 +100,8 @@ class Protocol:
         for key, cfg in self.models.items():
             if any(a in cfg["model"] for a in _MOVING_ALIASES):
                 out.append(f"model {key} uses a moving alias ({cfg['model']}): freeze an exact version")
+        if any(c["provider"] == "anthropic" for c in self.models.values()) and self.temperature != 1.0:
+            out.append("Anthropic models only sample at temperature 1.0: use 1.0 for all models")
         if self.temperature <= 0 and self.n_runs > 1:
             out.append("temperature 0 makes repeated runs uninformative about stability")
         if self.match_threshold is None:

@@ -37,7 +37,13 @@ class AnthropicProvider(Provider):
         return anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
     def complete(self, model, system, prompt, temperature, max_tokens):
-        r = self._client().messages.create(model=model, max_tokens=max_tokens, temperature=temperature,
+        # Current Anthropic API/SDK versions no longer accept temperature, top_p or top_k:
+        # sampling always uses the default temperature of 1.0, and nothing replaces it.
+        # https://platform.claude.com/docs/en/api/migration-2026-10-21
+        if temperature != 1.0:
+            raise ValueError(f"Anthropic models sample at temperature 1.0 only (got {temperature}); "
+                             "set Protocol.temperature = 1.0 so that all models share the same setting")
+        r = self._client().messages.create(model=model, max_tokens=max_tokens,
                                            system=system, messages=[{"role": "user", "content": prompt}])
         return "".join(b.text for b in r.content if b.type == "text")
 
