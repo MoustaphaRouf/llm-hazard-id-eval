@@ -64,6 +64,14 @@ def test_failed_runs_are_archived(tmp_path):
     assert counts["failed"] == 1
     assert generation.load_runs(tmp_path) == []
     assert generation.load_runs(tmp_path, ok_only=False)[0]["status"] == "failed"
+    # On resume, the failed run is retried (not skipped) and replaced when it succeeds.
+    class Fixed:
+        def complete(self, *a):
+            return '{"dangers": [{"libelle": "x"}]}'
+    again = generation.run_campaign(d, Protocol(n_runs=1), tmp_path, conditions=("blind",), keys=["A"],
+                                    providers={"anthropic": Fixed()}, pause_s=0)
+    assert again["run"] == 1 and again["skipped"] == 0
+    assert generation.load_runs(tmp_path)[0]["n_hazards"] == 1
 
 
 def test_protocol_flags_moving_aliases():

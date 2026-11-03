@@ -2,8 +2,8 @@
 
 Each run is archived as one JSON file named
 ``<dossier>__<model key>__<condition>__run<NN>.json``. The campaign is
-resumable: a run whose file already exists is skipped, so an interrupted
-campaign is simply relaunched.
+resumable: a successful run whose file already exists is skipped and a
+failed one is retried, so an interrupted campaign is simply relaunched.
 """
 from __future__ import annotations
 
@@ -73,8 +73,10 @@ def run_campaign(dossiers: dict[str, Dossier], protocol: Protocol, out_dir: str 
                 for n in range(1, protocol.n_runs + 1):
                     path = out / f"{did}__{key}__{cond}__run{n:02d}.json"
                     if path.exists():
-                        counts["skipped"] += 1
-                        continue
+                        # Resume: keep successful runs, retry failed ones.
+                        if json.loads(path.read_text(encoding="utf-8")).get("status") == "ok":
+                            counts["skipped"] += 1
+                            continue
                     counts["run"] += 1
                     try:
                         raw = clients[cfg["provider"]].complete(
