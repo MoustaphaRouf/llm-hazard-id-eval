@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hazid"
-version = "0.1.0"
+version = "0.1.1"
 description = "Evaluating LLMs as participants in ATM hazard-identification sessions (FHA/PSSA)"
 readme = "README.md"
 license = {text = "MIT"}

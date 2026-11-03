@@ -136,3 +136,14 @@ def test_canvas_skips_example_row_and_selects_column(tmp_path):
     assert sorted(canvas.load_canvas(path)) == ["FIC-02"]
     with pytest.raises(ValueError):
         canvas.load_canvas(path, hazard_column="Colonne absente")
+
+
+def test_provider_reuses_one_client():
+    from hazid.providers import GoogleProvider
+    made = []
+    class P(GoogleProvider):
+        def _make_client(self):
+            made.append(1)
+            return object()
+    p = P()
+    assert p._client() is p._client() and len(made) == 1

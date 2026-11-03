@@ -12,6 +12,15 @@ import random
 
 class Provider:
     name = "base"
+    _cached = None
+
+    def _client(self):
+        if self._cached is None:
+            self._cached = self._make_client()
+        return self._cached
+
+    def _make_client(self):
+        raise NotImplementedError
 
     def complete(self, model: str, system: str, prompt: str, temperature: float, max_tokens: int) -> str:
         raise NotImplementedError
@@ -23,7 +32,7 @@ class Provider:
 class AnthropicProvider(Provider):
     name = "anthropic"
 
-    def _client(self):
+    def _make_client(self):
         import anthropic
         return anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
@@ -39,7 +48,7 @@ class AnthropicProvider(Provider):
 class OpenAIProvider(Provider):
     name = "openai"
 
-    def _client(self):
+    def _make_client(self):
         from openai import OpenAI
         return OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
@@ -57,7 +66,7 @@ class OpenAIProvider(Provider):
 class GoogleProvider(Provider):
     name = "google"
 
-    def _client(self):
+    def _make_client(self):
         from google import genai
         return genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 
