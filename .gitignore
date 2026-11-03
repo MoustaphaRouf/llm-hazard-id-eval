@@ -1,0 +1,12 @@
+__pycache__/
+*.egg-info/
+.ipynb_checkpoints/
+.pytest_cache/
+# Study data never leaves the study environment
+data/
+runs/
+executions/
+*.xlsx
+!examples/*.xlsx
+.env
+runs_demo/
