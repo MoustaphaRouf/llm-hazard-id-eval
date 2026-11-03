@@ -1,4 +1,5 @@
 import json
+import pandas as pd
 
 import openpyxl
 import pytest
@@ -162,3 +163,23 @@ def test_anthropic_requires_default_temperature():
     with pytest.raises(ValueError):
         AnthropicProvider().complete("claude-sonnet-4-6", "s", "p", 0.7, 100)
     assert any("1.0" in w for w in Protocol(temperature=0.7, match_threshold=0.5).warnings())
+
+
+def test_manual_review_round_trip(campaign, tmp_path):
+    from hazid import manual
+    ds, out, _ = campaign
+    runs = generation.load_runs(out)
+    humans = {k: v.human_hazards for k, v in ds.items()}
+    table = manual.candidates(runs, humans, "FIC-01", k=5, method="char-ngrams")
+    assert len(table) == 5 * len(humans["FIC-01"])
+    path = tmp_path / "review.xlsx"
+    manual.write_review_sheet(table, path)
+    review = pd.read_excel(path, dtype={"Même danger ?": object})
+    # Reviewer accepts the best candidate of every panel hazard.
+    review.loc[review["Rang"] == 1, "Même danger ?"] = "Oui"
+    res = manual.recall_from_review(review, runs)
+    assert set(res["condition"]) == {"blind", "challenger"}
+    assert res["recall_per_run"].between(0, 1).all()
+    assert (res["recall_union"] >= res["recall_per_run"]).all()
+    none = review.assign(**{"Même danger ?": "Non"})
+    assert (manual.recall_from_review(none, runs)["recall_union"] == 0).all()

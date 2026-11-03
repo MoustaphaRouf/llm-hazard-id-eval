@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hazid"
-version = "0.1.3"
+version = "0.1.4"
 description = "Evaluating LLMs as participants in ATM hazard-identification sessions (FHA/PSSA)"
 readme = "README.md"
 license = {text = "MIT"}
@@ -14,6 +14,7 @@ dependencies = ["pandas>=2.0", "scikit-learn>=1.3", "openpyxl>=3.1"]
 
 [project.optional-dependencies]
 providers = ["anthropic", "openai", "google-genai"]
+review = ["sentence-transformers"]
 dev = ["pytest>=7", "nbformat", "nbconvert", "ipykernel"]
 
 [tool.setuptools.packages.find]
