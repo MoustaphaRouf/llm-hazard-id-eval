@@ -43,21 +43,28 @@ def _header_and_rows(sheet):
     raise ValueError(f"header '{ID}' not found in sheet '{sheet.title}'")
 
 
-def load_canvas(path: str | Path) -> dict[str, Dossier]:
+def load_canvas(path: str | Path, hazard_column: str = HAZARD_TEXT, skip_examples: bool = True) -> dict[str, Dossier]:
+    """Load every file of the canvas.
+
+    ``hazard_column`` selects the panel's formulation: the normalised one by
+    default (the protocol), or e.g. ``"Libellé du danger (verbatim)"``; any
+    deviation from the protocol must be recorded in the study log. Rows whose
+    identifier contains "exemple" (the filled-in example row) are skipped.
+    """
     import openpyxl
 
     wb = openpyxl.load_workbook(path, data_only=True)
     head_a, rows_a = _header_and_rows(wb[SHEET_CONTEXT])
     dossiers = {}
     for row in rows_a:
-        if not row or not row[0]:
+        if not row or not row[0] or (skip_examples and "exemple" in str(row[0]).lower()):
             continue
         fields = [f"{head_a[i]} : {v}" for i, v in enumerate(row)
                   if v not in (None, "") and head_a[i] not in NOT_CONTEXT]
         dossiers[row[0]] = Dossier(row[0], "\n".join(fields))
 
     head_b, rows_b = _header_and_rows(wb[SHEET_HAZARDS])
-    i_no, i_txt = head_b.index(HAZARD_NO), head_b.index(HAZARD_TEXT)
+    i_no, i_txt = head_b.index(HAZARD_NO), head_b.index(hazard_column)
     for row in rows_b:
         if row and row[0] in dossiers and row[i_txt]:
             dossiers[row[0]].human_hazards.append({"reference": row[i_no], "libelle": str(row[i_txt])})

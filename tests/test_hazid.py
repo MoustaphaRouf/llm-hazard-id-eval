@@ -127,3 +127,12 @@ def test_collapse_merges_near_duplicates():
     assert len(adjudication.build_lot(runs, {}, None)) == 2
     lot = adjudication.build_lot(runs, {}, collapse_threshold=0.5)
     assert len(lot) == 1 and lot[0][5] == 2   # merged, two models converged
+
+
+def test_canvas_skips_example_row_and_selects_column(tmp_path):
+    path = tmp_path / "c.xlsx"
+    rows = [dict(example.DOSSIERS[0], id="EDS-00 (exemple)"), example.DOSSIERS[1]]
+    canvas.write_canvas(rows, path, example.CONTEXT_FIELDS)
+    assert sorted(canvas.load_canvas(path)) == ["FIC-02"]
+    with pytest.raises(ValueError):
+        canvas.load_canvas(path, hazard_column="Colonne absente")
