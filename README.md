@@ -52,6 +52,9 @@ repository) and on a mock provider, so the whole pipeline runs offline, without 
 The [walkthrough notebook](notebooks/protocol_walkthrough.ipynb) shows each of them on the example.
 Its numbers describe the mock, not any real model.
 
+[`notebooks/pilot_colab.ipynb`](notebooks/pilot_colab.ipynb) runs a 3-file pilot (1 calibration file,
+2 measurement files, 90 calls) in Google Colab on your own canvas, with keys from the Colab secrets manager.
+
 ## Usage
 
 ```bash
