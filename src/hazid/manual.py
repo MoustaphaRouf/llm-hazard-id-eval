@@ -12,7 +12,12 @@ Ranking uses a local multilingual sentence-embedding model when
 back to character n-gram TF-IDF otherwise.
 
 Limitation: a match ranked below ``k`` is never shown, so recall is a lower
-bound; report ``k`` with the results.
+bound; report ``k`` with the results. The pilot used k = 10 and still found
+matches at ranks 9-10, hence the default of 20.
+
+The pilot also showed that similarity, lexical or semantic, does not replace
+the reviewer: against the reviewer's judgement, embedding similarity reached
+an AUC of 0.63 and no threshold exceeded 13 % precision.
 """
 from __future__ import annotations
 
@@ -25,7 +30,14 @@ import pandas as pd
 from .matching import labels, normalise
 
 EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
-CHOICES = ("Oui", "Partiel", "Non")
+# Review codes. The pilot showed that "partial" mixes two different cases, so they are coded apart:
+#   Composante  - the model hazard isolates one component of a composite panel hazard
+#                 (e.g. a report hazard "wind, QNH and QFE data erroneous" split by a model into
+#                 "wind data erroneous" and "QNH/QFE measurement erroneous"): legitimate coverage;
+#   Recouvrement - any other partial overlap (more general, different consequence...): incomplete.
+# "Partiel" (pilot code) is still read, and treated as Composante + Recouvrement.
+CHOICES = ("Oui", "Composante", "Recouvrement", "Non")
+COMPONENT, OVERLAP, LEGACY_PARTIAL = "Composante", "Recouvrement", "Partiel"
 
 
 def _similarity(a: list[str], b: list[str], method: str) -> np.ndarray:
@@ -51,7 +63,7 @@ def default_method() -> str:
         return "char-ngrams"
 
 
-def candidates(runs: list[dict], humans: dict[str, list[dict]], dossier: str, k: int = 10,
+def candidates(runs: list[dict], humans: dict[str, list[dict]], dossier: str, k: int = 20,
                method: str | None = None) -> pd.DataFrame:
     """Top-k model formulations for each panel hazard of ``dossier``.
 
@@ -118,14 +130,22 @@ def write_review_sheet(table: pd.DataFrame, path: str | Path) -> None:
     wb.save(path)
 
 
-def recall_from_review(review: pd.DataFrame, runs: list[dict], count_partial: bool = False) -> pd.DataFrame:
+def recall_from_review(review: pd.DataFrame, runs: list[dict], count_partial: bool | str = False) -> pd.DataFrame:
     """Per-run and union recall from the reviewer's answers.
 
     A panel hazard counts as found by a run if the run contains at least one
-    formulation the reviewer marked "Oui" (and "Partiel" if ``count_partial``)
-    for that hazard.
+    formulation accepted for that hazard. Accepted codes:
+
+    * ``count_partial=False``: "Oui" only (strict);
+    * ``count_partial="component"``: "Oui" + "Composante" (the decomposition rule);
+    * ``count_partial=True``: "Oui" + every partial code (broad).
     """
-    ok = {"Oui", "Partiel"} if count_partial else {"Oui"}
+    if count_partial == "component":
+        ok = {"Oui", COMPONENT}
+    elif count_partial:
+        ok = {"Oui", COMPONENT, OVERLAP, LEGACY_PARTIAL}
+    else:
+        ok = {"Oui"}
     review = review.copy()
     review["Même danger ?"] = review["Même danger ?"].astype(str).str.strip()
     good = review[review["Même danger ?"].isin(ok)]

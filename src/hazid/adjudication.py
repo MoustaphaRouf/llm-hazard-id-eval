@@ -60,8 +60,35 @@ def _collapse(items, threshold):
     return kept
 
 
-def write_workbook(runs, humans, path: str | Path, seed: int, collapse_threshold: float | None = None) -> int:
-    """Write the full workbook (Adjudication + key); return the number of lines."""
+def sample_lot(lot, max_model_per_dossier: int, seed: int):
+    """Keep every panel hazard and a random sample of model hazards per file.
+
+    The pilot produced 908 lines for two files, far too many for peer
+    adjudicators. Panel hazards are all kept (they are the reference the
+    adjudicators implicitly compare against, and they keep the origin hidden);
+    model hazards are sampled uniformly, with a fixed seed, so the validity
+    rate estimated on the sample applies to all model hazards of the file.
+    """
+    rng = random.Random(seed)
+    humans = [x for x in lot if x[2] == ORIGIN_HUMAN]
+    by_dossier = {}
+    for x in lot:
+        if x[2] != ORIGIN_HUMAN:
+            by_dossier.setdefault(x[0], []).append(x)
+    models = []
+    for did in sorted(by_dossier):
+        items = by_dossier[did]
+        models += items if len(items) <= max_model_per_dossier else rng.sample(items, max_model_per_dossier)
+    return humans + models
+
+
+def write_workbook(runs, humans, path: str | Path, seed: int, collapse_threshold: float | None = None,
+                   max_model_per_dossier: int | None = None) -> int:
+    """Write the full workbook (Adjudication + key); return the number of lines.
+
+    ``max_model_per_dossier`` samples model hazards (see :func:`sample_lot`);
+    the sampling seed is ``seed`` as well, so the workbook is reproducible.
+    """
     import openpyxl
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
@@ -79,6 +106,8 @@ def write_workbook(runs, humans, path: str | Path, seed: int, collapse_threshold
             c.fill = PatternFill("solid", fgColor=fill)
 
     lot = build_lot(runs, humans, collapse_threshold)
+    if max_model_per_dossier is not None:
+        lot = sample_lot(lot, max_model_per_dossier, seed)
     random.Random(seed).shuffle(lot)
 
     wb = openpyxl.Workbook()

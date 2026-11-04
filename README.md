@@ -23,7 +23,7 @@ panel's situation: same information, same task.
 | Models | three providers, exact versions frozen | results should not be one vendor's artefact |
 | Repetitions | 5 runs at temperature 1.0 (the only value current Anthropic APIs accept, used for all models) | a hazard that appears once in five runs is not the same evidence as one that appears every time |
 | Anti-contamination | automatic lexical check + manual check | no panel hazard may leak into the blind context |
-| Matching | TF-IDF similarity, threshold fixed on calibration files before results | *proposes* correspondences only |
+| Matching | by a reviewer, on the top 20 candidates per panel hazard ranked by a local embedding model, model identity hidden; codes *same / component / overlap / different* | the pilot showed that similarity, lexical or semantic, cannot decide whether two formulations name the same hazard |
 | Judgement | blind adjudication by peers who do not know the files: panel and model hazards mixed, origin hidden | no model grades its own output, and the study lead does not adjudicate |
 | Reproducibility | prompt and protocol fingerprints in every run file; frozen shuffle seed | the first question a reviewer will ask |
 
@@ -32,10 +32,50 @@ judged valid by blind adjudicators, and **later observed in operation**.
 
 ## Status
 
-The protocol and the tooling are complete and tested; a pilot on real files has started. The real
-files are operational safety data and are **not** in this repository, nor are any outputs from
-them. Everything here runs on a fictional example (files `FIC-01`, `FIC-02`, invented for this
-repository) and on a mock provider, so the whole pipeline runs offline, without API keys, and in CI.
+A pilot on 3 real files (35 panel hazards, 3 models, 90 runs) was completed in November 2026; see
+[Pilot results](#pilot-results) and the [pilot note](docs/PILOT.md). Blind peer adjudication of the
+model-only hazards is the next step, followed by the full campaign.
+
+The real files are operational safety data and are **not** in this repository, nor are any
+outputs from them; only aggregate figures are reported. Everything here runs on a fictional example
+(files `FIC-01`, `FIC-02`, invented for this repository) and on a mock provider, so the whole
+pipeline runs offline, without API keys, and in CI.
+
+## Pilot results
+
+Blind condition, share of the 35 panel hazards found, counting full and partial matches
+(the partial rule is explained below), pooled over the three files:
+
+| Model | Hazards proposed per run | Recall, one run | Recall, five runs |
+|---|---|---|---|
+| Claude Sonnet 4.6 | 22 | 18 % | 66 % |
+| GPT-5.1 | 31 | 18 % | 43 % |
+| Gemini 3.1 Pro (preview) | 7 | 7 % | 29 % |
+
+What the pilot showed:
+
+1. **Matching, not generation, is the measurement bottleneck.** Word-level matching found almost
+   none of the panel's hazards; embedding similarity barely tracked the reviewer's judgement
+   (AUC 0.63, no threshold above 13 % precision). Deciding whether a model found a hazard needs an
+   expert, so matching is now manual, assisted by ranking.
+2. **One consultation understates a model's contribution.** Five runs found three to four times more
+   panel hazards than one.
+3. **Granularity drives the result.** Counting full matches only, recall stays at or below 10 % per
+   run. Most matches are partial, largely because models state one notion per hazard while reports
+   often group several (e.g. "wind, QNH and QFE data erroneous" against "wind data erroneous" and
+   "QNH/QFE measurement erroneous"). The review codes now separate this *component* case from other
+   partial *overlap*.
+4. **Volume differs fourfold between models** (7 to 31 hazards per run), so recall cannot be read
+   without the validity of what is proposed.
+5. **Preliminary, unblinded observation:** the study lead and a second reader judged every model-only
+   hazard they read relevant, some more relevant than hazards the panels retained. Both knew the
+   files and the origin of the hazards; this is the hypothesis that blind peer adjudication must test.
+
+Pilot limits: 3 files and 35 hazards (no difference between models is established), one reviewer
+with the partial rule written after the review, top-10 review depth (a lower bound), verbatim rather
+than normalised panel hazards, temperature 1.0, a preview Gemini version. Run-to-run stability and
+inter-model agreement, computed with word-level matching, came out near zero and are treated as a
+measurement artefact until checked by hand.
 
 ## Indicators
 
@@ -52,8 +92,13 @@ repository) and on a mock provider, so the whole pipeline runs offline, without 
 The [walkthrough notebook](notebooks/protocol_walkthrough.ipynb) shows each of them on the example.
 Its numbers describe the mock, not any real model.
 
-[`notebooks/pilot_colab.ipynb`](notebooks/pilot_colab.ipynb) runs a 3-file pilot (1 calibration file,
-2 measurement files, 90 calls) in Google Colab on your own canvas, with keys from the Colab secrets manager.
+[`notebooks/pilot_colab.ipynb`](notebooks/pilot_colab.ipynb) runs the 3-file pilot (90 calls) in Google
+Colab on your own anonymised canvas, with keys from the Colab secrets manager: campaign, assisted manual
+matching (review workbooks to fill in), recall under strict, component and broad rules, all models
+combined, and a sampled blind adjudication workbook for peers.
+
+`content_stability` and the `jaccard_*` indicators rely on word-level matching; on real files they came
+out near zero in the pilot and should be checked on a hand-judged sample before being reported.
 
 ## Usage
 
@@ -115,12 +160,15 @@ The code was refactored from the study notebook and its two scripts (generation 
   de-duplication alone can leave several hundred paraphrases per file for the adjudicators;
   merged lines keep, in the key, how many models converged on them.
 - **Protocol fingerprint** in every run file; failed runs archived with their error.
-- **Offline mock provider and 11 tests**, run by GitHub Actions.
+- **Offline mock provider and tests**, run by GitHub Actions.
 
 ## Limitations
 
-- Lexical matching misses paraphrases with different vocabulary and can pair distinct hazards that
-  share words; it only pre-selects, and the threshold must be checked by hand.
+- Automatic matching, lexical or semantic, does not reproduce an expert's judgement of "same
+  hazard" (pilot: AUC 0.63); recall therefore rests on manual review, with its own reliability to
+  establish (second coder, Cohen's kappa) and a review depth that makes it a lower bound.
+- Results depend on how the reference is worded: composite panel hazards turn many model hits into
+  partial matches. Normalising the panel hazards (one notion per entry, by a person) reduces this.
 - The panel's list is a reference, not ground truth: a model hazard absent from it may be a
   genuine miss or noise. Only blind adjudication, and later operational evidence, can tell.
 - Retrospective: the model does not interact with the panel, so the effect of its suggestions on
@@ -145,9 +193,12 @@ combined failures and the human and organisational dimensions.
 
 Protocole rétrospectif pour évaluer la participation d'un modèle de langage à la séance
 d'identification des dangers (FHA/PSSA) d'une étude de sécurité ATM : deux conditions (aveugle,
-challenger), trois modèles, cinq répétitions, contrôle anti-contamination, appariement lexical
-calibré avant résultats, adjudication en aveugle par des pairs. Les dossiers réels ne sont pas
-publiés ; tout s'exécute sur un exemple fictif et un fournisseur simulé.
+challenger), trois modèles, cinq répétitions, contrôle anti-contamination, appariement manuel
+assisté (codes *même danger / composante / recouvrement / différent*), adjudication en aveugle par
+des pairs. Un pilote sur 3 dossiers (35 dangers, 90 exécutions) montre que les modèles couvrent,
+critère large, de 29 à 66 % des dangers du panel en cinq exécutions, mais au plus 18 % en une seule,
+et que l'appariement automatique ne remplace pas le jugement d'expert. Les dossiers réels ne sont
+pas publiés ; seuls des chiffres agrégés le sont, et le code s'exécute sur un exemple fictif.
 
 ## License
 

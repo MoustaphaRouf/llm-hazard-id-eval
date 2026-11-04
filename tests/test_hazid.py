@@ -183,3 +183,35 @@ def test_manual_review_round_trip(campaign, tmp_path):
     assert (res["recall_union"] >= res["recall_per_run"]).all()
     none = review.assign(**{"Même danger ?": "Non"})
     assert (manual.recall_from_review(none, runs)["recall_union"] == 0).all()
+
+
+def test_partial_codes_and_legacy(campaign, tmp_path):
+    from hazid import manual
+    ds, out, _ = campaign
+    runs = generation.load_runs(out)
+    humans = {k: v.human_hazards for k, v in ds.items()}
+    t = manual.candidates(runs, humans, "FIC-01", k=3, method="char-ngrams")
+    t["Même danger ?"] = "Non"
+    t.loc[t["Rang"] == 1, "Même danger ?"] = "Composante"
+    t.loc[t["Rang"] == 2, "Même danger ?"] = "Recouvrement"
+    strict = manual.recall_from_review(t, runs)
+    comp = manual.recall_from_review(t, runs, count_partial="component")
+    broad = manual.recall_from_review(t, runs, count_partial=True)
+    assert (strict["recall_union"] == 0).all()
+    assert (comp["recall_union"] <= broad["recall_union"]).all() and comp["recall_union"].sum() > 0
+    legacy = t.replace({"Composante": "Partiel", "Recouvrement": "Partiel"})
+    assert manual.recall_from_review(legacy, runs, count_partial=True)["recall_union"].equals(broad["recall_union"])
+
+
+def test_adjudication_sampling_keeps_panel_and_caps_models(campaign, tmp_path):
+    ds, out, _ = campaign
+    runs = generation.load_runs(out)
+    humans = {k: v.human_hazards for k, v in ds.items()}
+    full = adjudication.build_lot(runs, humans)
+    small = adjudication.sample_lot(full, 3, seed=1)
+    n_h = sum(len(v) for v in humans.values())
+    assert sum(x[2] == "humain" for x in small) == n_h
+    assert len(small) == n_h + 3 * len(humans)
+    assert small == adjudication.sample_lot(full, 3, seed=1)
+    n = adjudication.write_workbook(runs, humans, tmp_path / "s.xlsx", seed=1, max_model_per_dossier=3)
+    assert n == len(small)
